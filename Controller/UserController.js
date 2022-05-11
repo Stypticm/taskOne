@@ -1,13 +1,19 @@
-import User from '../Schema/UserSchema.js'
-import bcrypt from "bcrypt";
+const bcrypt = require('bcrypt')
+const UserService = require('../Service/UserService')
 
 class UserController {
 
     async create(req, res) {
         try {
-            const {login, password} = req.body
-            const hashPassword = await bcrypt.hashSync(password, 7)
-            const user = await User.create({login, password: hashPassword})
+            const {
+                password
+            } = req.body
+            const hashPassword = await bcrypt.hashSync(password, 3)
+
+            const user = await UserService.create({
+                ...req.body,
+                password: hashPassword
+            })
             res.status(200).json(user)
         } catch (error) {
             res.status(500).json(error);
@@ -16,20 +22,16 @@ class UserController {
 
     async getAll(req, res) {
         try {
-            const users = await User.find()
+            const users = await UserService.getAll()
             return res.status(200).json(users)
         } catch (error) {
             res.status(500).json(error);
         }
     }
 
-    async getOne(req,res) {
+    async getOne(req, res) {
         try {
-            const id = req.params.id
-            if (!id) {
-                throw new Error("Id не указан");
-            }
-            const user = await User.findById(id)
+            const user = await UserService.getOne(req.params.id)
             return res.json(user)
         } catch (error) {
             res.status(500).json(error);
@@ -38,11 +40,7 @@ class UserController {
 
     async delete(req, res) {
         try {
-            const id = req.params.id
-            if (!id) {
-                throw new Error("Id не указан");
-            }
-            const user = await User.findByIdAndDelete(id)
+            const user = await UserService.delete(req.params.id)
             return res.json(user)
         } catch (error) {
             res.status(500).json(error);
@@ -51,12 +49,16 @@ class UserController {
 
     async update(req, res) {
         try {
-            const id = req.body._id
-            const {login, password} = req.body
+            const {
+                password
+            } = req.body
 
             const hashPassword = await bcrypt.hashSync(password, 7)
 
-            const user = await User.findByIdAndUpdate(id, {login, password: hashPassword}, {new: true})
+            const user = await UserService.update({
+                ...req.body,
+                password: hashPassword
+            })
             return res.json(user)
         } catch (error) {
             res.status(500).json(error);
@@ -64,4 +66,4 @@ class UserController {
     }
 }
 
-export default new UserController()
+module.exports = new UserController()

@@ -1,51 +1,24 @@
-import User from '../Schema/UserSchema.js'
-import bcrypt from 'bcrypt'
-import {
-    validationResult
-} from "express-validator";
-import jwt from 'jsonwebtoken'
-
-const generateAccessToken = (id) => {
-    const payload = {
-        id
-    }
-    return jwt.sign(payload, process.env.SECRET, {
-        expiresIn: '15m'
-    })
-}
+const AuthService = require('../Service/AuthService')
 
 class AuthController {
+
     async registration(req, res) {
         try {
-            const errors = validationResult(req)
-            if (!errors.isEmpty()) {
-                res.status(400).json({
-                    message: "Ошибка при регистрации",
-                    errors
-                })
-            }
             const {
                 login,
                 password
             } = req.body
-            const currentUser = await User.findOne({
-                login
+
+            const userData = await AuthService.registration(login, password)
+
+            res.cookie('refreshToken', userData.refreshToken, {
+                maxAge: 15 * 60 * 1000,
+                httpOnly: true
             })
-            if (currentUser) {
-                return res.status(400).json({
-                    message: "Такой пользователь уже существует"
-                })
-            }
-            const hashPassword = await bcrypt.hashSync(password, 7);
-            await User.create({
-                login,
-                password: hashPassword
-            })
-            return res.json({
-                message: "Пользователь создан"
-            })
+
+            return res.json(userData)
         } catch (error) {
-            res.status(400).json(`Ошибка: ${error}`);
+            res.json(error)
         }
     }
 
@@ -55,33 +28,46 @@ class AuthController {
                 login,
                 password
             } = req.body
-            const user = await User.findOne({
-                login
+
+            const userData = await AuthService.login(login, password)
+            res.cookie('refreshToken', userData.refreshToken, {
+                maxAge: 15 * 60 * 1000,
+                httpOnly: true
             })
-
-            if (!user) {
-                res.status(400).json({
-                    message: `Пользователь с таким ${user} не найден`
-                })
-            }
-
-            const validPassword = bcrypt.compareSync(password, user.password)
-
-            if (!validPassword) {
-                res.status(400).json({
-                    message: `Неверный пароль`
-                })
-            }
-
-            const token = generateAccessToken(user._id)
-            return res.json({
-                token
-            })
+            return res.json(userData)
         } catch (error) {
-            res.status(400).json(`Ошибка авторизации: ${error}`);
+            res.json(error)
         }
     }
 
+    async logout(req, res) {
+        try {
+            const {
+                refreshToken
+            } = req.cookies
+            const token = await AuthService.logout(refreshToken)
+            res.clearCookie('refreshToken')
+            return res.json(token)
+        } catch (error) {
+            res.json(error)
+        }
+    }
+
+    async refresh(req, res) {
+        try {
+            const {
+                refreshToken
+            } = req.cookies
+            const userData = await AuthService.refresh(refreshToken)
+            res.cookie('refreshToken', userData.refreshToken, {
+                maxAge: 15 * 60 * 1000,
+                httpOnly: true
+            })
+            return res.json(userData)
+        } catch (error) {
+            res.json(error)
+        }
+    }
 }
 
-export default new AuthController()
+module.exports = new AuthController()
